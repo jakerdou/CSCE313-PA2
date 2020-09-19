@@ -38,94 +38,129 @@ string remove_quotation(string str) {
     return str;
 }
 
+string trim_whitespace(string command) {
+    if (command[0] == ' ') {
+        command.erase(0, 1);
+    }
+    if (command[command.length()-1] == ' ') {
+        command.erase(command.length()-1, 1);
+    }
+    return command;
+}
+
+vector<string> parse_commands(string inputline) {
+    vector<string> commands;
+    stringstream ss(inputline);
+    string command;
+
+    while (getline(ss, command, '|')) {
+        command = trim_whitespace(command);
+        commands.push_back(command);
+    }
+
+    return commands;
+}
+
+void execute_command(vector<string> command) {
+    char* args[50];
+    for (int i=0; i<command.size(); i++)
+    {   
+        string arg = command.at(i);
+        args[i] = (char*) arg.c_str();
+    }
+    
+    execvp(args[0], args);
+}
+
 int main () {
 
+
     while (true){
+        int std_in = dup(0);
+
         cout << "My Shell$ "; //print a prompt
         string inputline;
         getline (cin, inputline); //get a line from standard input
+        vector<string> commands = parse_commands(inputline);        
 
-        char* args[10][50];
-        int num_args = 0, num_processes = 0;
-        stringstream ss(inputline);
-        string arg_input;
-        bool output_redir = false, input_redir = false;
-        string output_file, input_file;
+        for (int i=0; i<commands.size(); i++) {
+            // cout << "command: " << commands.at(i) << endl;
+            bool output_redir = false, input_redir = false;
+            string output_file, input_file;
+            string command = commands.at(i);
+            vector<string> args;
+            
+            stringstream ss(command);
+            string arg_input;
 
-        while (getline(ss, arg_input, ' ')) {
-            if (arg_input == ">") {
-                output_redir = true;
-                getline(ss, output_file, ' ');
+            // TODO: make parse_args command
+            while (getline(ss, arg_input, ' ')) {
+                if (arg_input == ">") {
+                    output_redir = true;
+                    getline(ss, output_file, ' ');
+                }
+                else if (arg_input == "<") {
+                    input_redir = true;
+                    getline(ss, input_file, ' ');
+                }
+                else {
+                    if (arg_input[0] == '\"' || arg_input[0] == '\'') {
+                        arg_input = remove_quotation(arg_input);
+                    }
+
+                    args.push_back(arg_input);
+                }
             }
-            else if (arg_input == "<") {
-                input_redir = true;
-                getline(ss, input_file, ' ');
+
+            if (command == string("exit")) {
+                cout << "Bye!! End of shell" << endl;
+                break;
             }
-            else if (arg_input == "|") {
-                args[num_processes][num_args] = NULL;
-                num_processes++;
-                num_args = 0;
-            }
-            else {
-                if (arg_input[0] == '\"' || arg_input[0] == '\'') {
-                    arg_input = remove_quotation(arg_input);
+
+            int fds[2];
+            pipe(fds);
+
+            int pid = fork ();
+            if (pid == 0) { //child process
+                cout << "in child\n";
+                int fd_out;
+                if (output_redir)
+                {
+                    fd_out = open(output_file.c_str(), O_RDWR|O_CREAT|O_TRUNC, 0666);
+                    dup2(fd_out, 1);
+                    close(fd_out);
                 }
 
-                char* arg_input_copy = strdup(arg_input.c_str());
+                int fd_in;
+                if (input_redir)
+                {
+                    fd_in = open(input_file.c_str(), O_RDONLY, 0666);
+                    dup2(fd_in, 0);
+                    close(fd_in);
+                }
 
-                args[num_processes][num_args] = arg_input_copy;
-                num_args++;
+                if(i<commands.size()-1) {
+                    dup2(fds[1], 1);
+                    close(fds[1]);
+                }
+
+                execute_command(args);
             }
+            else {
+                dup2(fds[0], 0);
+                close(fds[1]);
+                
+                waitpid (pid, 0, 0); //parent waits for child process
+                
 
-        }
 
-        cout << "ls: " << args[0][0] << endl;
+                // char pipe_buf[100];
 
+                // read(fds[0], pipe_buf, 100);
+                // cout << "from fds[1]: " << pipe_buf << endl;
 
-        if (inputline == string("exit")) {
-            cout << "Bye!! End of shell" << endl;
-            break;
-        }
-
-        int fds[2];
-        pipe(fds);
-
-        int pid = fork ();
-        if (pid == 0) { //child process
-
-            int fd_out;
-            if (output_redir)
-            {
-                fd_out = open(output_file.c_str(), O_RDWR|O_CREAT|O_TRUNC, 0666);
-                dup2(fd_out, 1);
             }
-
-            int fd_in;
-            if (input_redir)
-            {
-                fd_in = open(input_file.c_str(), O_RDONLY, 0666);
-                dup2(fd_in, 0);
-            }
-
-            dup2(fds[1], 1);
-
-
-            // cout << "pwd should be here: " << args[1][0] << endl;
-            execvp (args [0][0], args [0]);
-
-            close(fd_out);
-            close(fd_in);
         }
-        else {
-            waitpid (pid, 0, 0); //parent waits for child process
-
-
-
-            char pipe_buf[100];
-
-            read(fds[0], pipe_buf, 100);
-            cout << "from fds[1]: " << pipe_buf << endl;
-
-        }
+        dup2(std_in, 0);
     }
 }
