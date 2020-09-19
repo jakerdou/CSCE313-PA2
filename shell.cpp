@@ -70,21 +70,23 @@ int main () {
                 if (arg_input[0] == '\"' || arg_input[0] == '\'') {
                     arg_input = remove_quotation(arg_input);
                 }
-                
+
                 char* arg_input_copy = strdup(arg_input.c_str());
-                
+
                 args[num_processes][num_args] = arg_input_copy;
                 num_args++;
             }
-            
+
         }
-        
+
+        cout << "ls: " << args[0][0] << endl;
+
 
         if (inputline == string("exit")) {
             cout << "Bye!! End of shell" << endl;
             break;
         }
-        
+
         int fds[2];
         pipe(fds);
 
@@ -97,7 +99,7 @@ int main () {
                 fd_out = open(output_file.c_str(), O_RDWR|O_CREAT|O_TRUNC, 0666);
                 dup2(fd_out, 1);
             }
-            
+
             int fd_in;
             if (input_redir)
             {
@@ -108,8 +110,8 @@ int main () {
             dup2(fds[1], 1);
 
 
-            cout << "pwd should be here: " << args[1][0] << endl;
-            execvp (args [1][0], args [1]);
+            // cout << "pwd should be here: " << args[1][0] << endl;
+            execvp (args [0][0], args [0]);
 
             close(fd_out);
             close(fd_in);
@@ -118,11 +120,11 @@ int main () {
             waitpid (pid, 0, 0); //parent waits for child process
 
 
-            
+
             char pipe_buf[100];
 
             read(fds[0], pipe_buf, 100);
-            cout << "from fds[1]: " << pipe_buf << endl; 
+            cout << "from fds[1]: " << pipe_buf << endl;
 
         }
     }
