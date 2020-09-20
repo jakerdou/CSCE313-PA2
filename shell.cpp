@@ -63,13 +63,26 @@ vector<string> parse_commands(string inputline) {
 
 void execute_command(vector<string> command) {
     char* args[50];
-    for (int i=0; i<command.size(); i++)
+    for (int i=0; i<=command.size(); i++)
     {   
-        string arg = command.at(i);
-        args[i] = (char*) arg.c_str();
+        if (i<command.size()) {
+            string arg = command.at(i);
+            char* arg_copy = strdup(arg.c_str());
+            args[i] = arg_copy;
+        }
+        else {
+            args[i] = NULL;
+        }
     }
-    
-    execvp(args[0], args);
+
+    try
+    {
+        execvp(args[0], args);
+    }
+    catch(const exception& e)
+    {
+        cerr << e.what() << '\n';
+    }    
 }
 
 int main () {
@@ -78,7 +91,7 @@ int main () {
     while (true){
         int std_in = dup(0);
 
-        cout << "My Shell$ "; //print a prompt
+        cout << getenv("USER") << "$ "; //print a prompt
         string inputline;
         getline (cin, inputline); //get a line from standard input
         vector<string> commands = parse_commands(inputline);        
@@ -111,6 +124,7 @@ int main () {
                     args.push_back(arg_input);
                 }
             }
+            // execute_command(args);
 
             if (command == string("exit")) {
                 cout << "Bye!! End of shell" << endl;
@@ -151,14 +165,6 @@ int main () {
                 close(fds[1]);
                 
                 waitpid (pid, 0, 0); //parent waits for child process
-                
-
-
-                // char pipe_buf[100];
-
-                // read(fds[0], pipe_buf, 100);
-                // cout << "from fds[1]: " << pipe_buf << endl;
-
             }
         }
         dup2(std_in, 0);
